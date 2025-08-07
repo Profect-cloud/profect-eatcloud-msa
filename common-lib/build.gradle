@@ -1,0 +1,31 @@
+plugins {
+	id 'java-library'
+}
+
+group = 'com.eatcloud'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	api 'org.springframework.boot:spring-boot-starter:3.5.3'
+	api 'org.springframework.boot:spring-boot-starter-validation:3.5.3'
+	api 'org.springframework.boot:spring-boot-starter-web:3.5.3'
+	api 'org.springframework.boot:spring-boot-starter-data-jpa:3.5.3'
+
+	// JSON 처리
+	api 'com.fasterxml.jackson.core:jackson-databind'
+	api 'com.fasterxml.jackson.core:jackson-core'
+	api 'com.fasterxml.jackson.core:jackson-annotations'
+
+	// 테스트
+	testImplementation 'org.springframework.boot:spring-boot-starter-test:3.5.3'
+}

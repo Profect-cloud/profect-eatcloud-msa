@@ -1,27 +1,255 @@
+version: '3.8'
+
 services:
-  postgres:
+  # ================== 데이터베이스들 ==================
+  user-db:
     platform: linux/amd64
     image: postgis/postgis:latest
-    container_name: sample-postgres
+    container_name: user-db
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DB: eatcloud_db
+      POSTGRES_DB: user_db
       POSTGRES_USER: user
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     env_file:
       - .env
     volumes:
-      - ./src/main/resources/DB/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
-      - ./src/main/resources/DB/data.sql:/docker-entrypoint-initdb.d/02-data.sql:ro
+      - ./user-service/src/main/resources/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./user-service/src/main/resources/db/data.sql:/docker-entrypoint-initdb.d/02-data.sql:ro
+      - user_db_data:/var/lib/postgresql/data
+    networks:
+      - eatcloud-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d user_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  store-db:
+    platform: linux/amd64
+    image: postgis/postgis:latest
+    container_name: store-db
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: store_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    env_file:
+      - .env
+    volumes:
+      - ./store-service/src/main/resources/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./store-service/src/main/resources/db/data.sql:/docker-entrypoint-initdb.d/02-data.sql:ro
+      - store_db_data:/var/lib/postgresql/data
+    networks:
+      - eatcloud-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d store_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  order-db:
+    platform: linux/amd64
+    image: postgis/postgis:latest
+    container_name: order-db
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: order_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    env_file:
+      - .env
+    volumes:
+      - ./order-service/src/main/resources/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./order-service/src/main/resources/db/data.sql:/docker-entrypoint-initdb.d/02-data.sql:ro
+      - order_db_data:/var/lib/postgresql/data
+    networks:
+      - eatcloud-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d order_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  payment-db:
+    platform: linux/amd64
+    image: postgis/postgis:latest
+    container_name: payment-db
+    ports:
+      - "5435:5432"
+    environment:
+      POSTGRES_DB: payment_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    env_file:
+      - .env
+    volumes:
+      - ./payment-service/src/main/resources/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./payment-service/src/main/resources/db/data.sql:/docker-entrypoint-initdb.d/02-data.sql:ro
+      - payment_db_data:/var/lib/postgresql/data
+    networks:
+      - eatcloud-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d payment_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
-    image: redis:latest
-    container_name: sample-redis
+    image: redis:alpine
+    container_name: eatcloud-redis
     ports:
       - "6379:6379"
     volumes:
       - redis-data:/data
+    networks:
+      - eatcloud-network
+
+  # ================== MSA 인프라 ==================
+  eureka-server:
+    build:
+      context: .
+      dockerfile: eureka-server/Dockerfile
+    container_name: eureka-server
+    ports:
+      - "8761:8761"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    networks:
+      - eatcloud-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - eatcloud-network
+
+  # ================== 마이크로서비스들 ==================
+  user-service:
+    build:
+      context: .
+      dockerfile: user-service/Dockerfile
+    container_name: user-service
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - DB_HOST=user-db
+      - DB_NAME=user_db
+      - DB_USER=user
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - REDIS_HOST=redis
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka
+    env_file:
+      - .env
+    depends_on:
+      user-db:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - eatcloud-network
+
+  store-service:
+    build:
+      context: .
+      dockerfile: store-service/Dockerfile
+    container_name: store-service
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - DB_HOST=store-db
+      - DB_NAME=store_db
+      - DB_USER=user
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - REDIS_HOST=redis
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka
+    env_file:
+      - .env
+    depends_on:
+      store-db:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - eatcloud-network
+
+  order-service:
+    build:
+      context: .
+      dockerfile: order-service/Dockerfile
+    container_name: order-service
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - DB_HOST=order-db
+      - DB_NAME=order_db
+      - DB_USER=user
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - REDIS_HOST=redis
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka
+    env_file:
+      - .env
+    depends_on:
+      order-db:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - eatcloud-network
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: payment-service/Dockerfile
+    container_name: payment-service
+    ports:
+      - "8084:8084"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - DB_HOST=payment-db
+      - DB_NAME=payment_db
+      - DB_USER=user
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - REDIS_HOST=redis
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka
+    env_file:
+      - .env
+    depends_on:
+      payment-db:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - eatcloud-network
 
 volumes:
+  user_db_data:
+  store_db_data:
+  order_db_data:
+  payment_db_data:
   redis-data:
+
+networks:
+  eatcloud-network:
+    driver: bridge
