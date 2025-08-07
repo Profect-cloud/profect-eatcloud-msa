@@ -1,1 +1,11 @@
-rootProject.name = 'eatcloud'
+rootProject.name = 'profect-eatcloud-msa'
+
+// 기존 서비스들
+include 'eureka-server'
+include 'api-gateway'
+include 'order-service'
+
+// include 'user-service'
+// include 'store-service'
+// include 'payment-service'
+// include 'common'
