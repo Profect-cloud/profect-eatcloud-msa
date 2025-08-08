@@ -7,7 +7,7 @@ services:
     env_file:
       - /srv/eatcloud/.env
     environment:
-      - SPRING_CONFIG_IMPORT=optional:file:/app/config/application-secret.properties
+      - JAVA_TOOL_OPTIONS=-Dspring.config.import=optional:file:/app/config/application-secret.properties
     volumes:
       - /srv/eatcloud/application-secret.properties:/app/config/application-secret.properties:ro
     depends_on:
