@@ -1,113 +1,74 @@
-name: ci-cd-compose
+name: CI/CD (develop → EC2)
+
 on:
   push:
-    branches: [ main, develop ]
-  workflow_dispatch:
+    branches: [ "develop" ]
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: deploy-develop
   cancel-in-progress: true
 
-permissions:
-  contents: read
-
-env:
-  IMAGE_REPO: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/profect-eatcloud-msa
-
 jobs:
-  build-and-push:
+  build-and-deploy:
     runs-on: ubuntu-latest
-    outputs:
-      image_tag: ${{ steps.meta.outputs.sha }}
+    permissions:
+      contents: read
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Assert Docker Hub secrets
-        run: |
-          test -n "${{ secrets.DOCKERHUB_USERNAME }}" || (echo "❌ DOCKERHUB_USERNAME missing" && exit 1)
-          test -n "${{ secrets.DOCKERHUB_TOKEN }}"    || (echo "❌ DOCKERHUB_TOKEN missing" && exit 1)
-
-      - name: Derive image tag (git sha)
-        id: meta
-        run: echo "sha=${GITHUB_SHA}" >> $GITHUB_OUTPUT
-
-      # ▶ 러너에서 먼저 JAR 빌드 (로그 선명, 실패 원인 명확)
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: "21"
 
-      - name: Gradle build (skip tests, verbose)
-        run: |
-          chmod +x gradlew
-          ./gradlew --no-daemon clean bootJar -x test --stacktrace --info
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*','**/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-gradle-
 
-      # Buildx & Docker Hub 로그인
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with: { driver: docker-container }
+      # Dockerfile이 '내부에서 gradle build'를 한다면 이 단계는 옵션이지만,
+      # Dockerfile이 'build/libs/*.jar'를 COPY하는 구조라면 필수입니다.
+      - name: Build (Gradle)
+        run: ./gradlew bootJar -x test --no-daemon
 
-      - name: Login Docker Hub
+      - name: Docker Login (Hub)
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # ▶ 이제 런타임 이미지에 JAR만 담아 푸시
-      - name: Build & Push image
+      - name: Build & Push Image
         uses: docker/build-push-action@v6
         with:
-          builder: ${{ steps.buildx.outputs.name }}
           context: .
           push: true
           tags: |
-            ${{ env.IMAGE_REPO }}:${{ steps.meta.outputs.sha }}
-            ${{ env.IMAGE_REPO }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            ${{ secrets.DOCKERHUB_USERNAME }}/eatcloud-api:develop-${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/eatcloud-api:develop-latest
 
-  deploy:
-    needs: build-and-push
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - name: SSH to EC2 & deploy via Compose
-        uses: appleboy/ssh-action@v1.2.0
-        env:
-          IMAGE_REPO: ${{ env.IMAGE_REPO }}
+      - name: Copy compose to EC2
+        uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          script_stop: true
-          script: |
-            set -euo pipefail
-            cd ${{ secrets.APP_DIR }}
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "docker-compose.prod.yml"
+          target: "/srv/eatcloud/"
 
-            # (Private 레포면 필요, Public이어도 무해)
-            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
-
-            IMAGE_PATH="${IMAGE_REPO}:${{ needs.build-and-push.outputs.image_tag }}"
-
-            if grep -q '^APP_IMAGE=' .env; then
-              sed -i "s#^APP_IMAGE=.*#APP_IMAGE=${IMAGE_PATH}#g" .env
-            else
-              echo "APP_IMAGE=${IMAGE_PATH}" >> .env
-            fi
-
-            docker compose pull
-            docker compose up -d --remove-orphans
-
-      - name: Smoke test
+      - name: Deploy on EC2
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            for i in {1..10}; do
-              curl -fsS http://localhost/actuator/health && exit 0
-              sleep 3
-            done
-            echo "Health check failed"; exit 1
+            set -e
+            cd /srv/eatcloud
+            docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" -p "${{ secrets.DOCKERHUB_TOKEN }}"
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/eatcloud-api:develop-latest
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            docker image prune -f

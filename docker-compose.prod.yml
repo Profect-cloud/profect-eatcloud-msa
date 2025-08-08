@@ -1,0 +1,23 @@
+services:
+  app:
+    image: sunmoonkr/eatcloud-api:develop-latest
+    container_name: eatcloud-api
+    ports:
+      - "8080:8080"
+    env_file:
+      - /srv/eatcloud/.env
+    environment:
+      - SPRING_CONFIG_IMPORT=optional:file:/app/config/application-secret.properties
+    volumes:
+      - /srv/eatcloud/application-secret.properties:/app/config/application-secret.properties:ro
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    container_name: eatcloud-redis
+    command: ["redis-server","--appendonly","yes"]
+    volumes:
+      - /srv/eatcloud/data/redis:/data
+    restart: unless-stopped

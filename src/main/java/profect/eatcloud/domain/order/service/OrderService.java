@@ -1,6 +1,5 @@
 package profect.eatcloud.domain.order.service;
 
-import com.amazonaws.services.kms.model.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -152,7 +151,7 @@ public class OrderService {
     @Transactional
     public void updateOrderStatus(UUID orderId, String statusCode) {
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new NotFoundException("주문을 찾을 수 없습니다."));
+                .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다."));
 
         OrderStatusCode statusCodeEntity = orderStatusCodeRepository.findById(statusCode)
                 .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 상태 코드입니다."));

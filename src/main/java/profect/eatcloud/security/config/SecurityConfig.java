@@ -94,7 +94,7 @@ public class SecurityConfig {
 			)
 			.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
 			.exceptionHandling(exception -> exception
-				.authenticationEntryPoint((_, response, _) -> {
+				.authenticationEntryPoint((request, response, ex) -> {
 					response.setStatus(HttpStatus.UNAUTHORIZED.value());
 					response.setContentType("application/json");
 					response.getWriter().write("{\"error\": \"Unauthorized access\"}");
