@@ -4,11 +4,9 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import org.springframework.context.annotation.Bean;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.mail.MailException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -33,12 +31,8 @@ public class AuthService {
 	private final AdminRepository adminRepository;
 	private final ManagerRepository managerRepository;
 	private final PasswordEncoder passwordEncoder;
-	@Bean
-	public PasswordEncoder passwordEncoder() {
-		return new BCryptPasswordEncoder();
-	}
 	private final JwtTokenProvider jwtTokenProvider;
-	private final RedisTemplate<String, Object> redisTemplate;
+	private final RedisTemplate<Object, Object> redisTemplate;
 	private final MailService mailService;
 	private final RefreshTokenService refreshTokenService;
 
@@ -110,18 +104,18 @@ public class AuthService {
 		// 이메일 전송
 		try {
 			mailService.sendMail(req.getEmail(), subject, text);
-		} catch (MailException e) {
+		} catch (org.springframework.mail.MailException e) {
 			throw new RuntimeException("이메일 전송에 실패했습니다. 다시 시도해주세요.", e);
 		}
 
 		// Redis에 저장 (key: "signup:{email}", value: SignupRequestDto+코드)
 		SignupRedisData data = new SignupRedisData(req, verificationCode);
-		redisTemplate.opsForValue().set("signup:" + req.getEmail(), data, 10, TimeUnit.MINUTES); // 10분 유효
+		redisTemplate.opsForValue().set("signup:" + req.getEmail(), data, 10, java.util.concurrent.TimeUnit.MINUTES); // 10분 유효
 	}
 
 	public void confirmEmail(String email, String code) {
 		String key = "signup:" + email;
-		SignupRedisData data = (SignupRedisData)redisTemplate.opsForValue().get(key);
+		SignupRedisData data = (SignupRedisData) redisTemplate.opsForValue().get(key);
 
 		if (data == null) {
 			throw new RuntimeException("만료되었거나 존재하지 않는 인증 요청입니다.");

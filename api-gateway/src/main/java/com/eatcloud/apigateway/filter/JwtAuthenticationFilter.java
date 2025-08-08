@@ -130,10 +130,19 @@
 				return true;
 			}
 
+			// Legacy Swagger paths (for backward compatibility)
 			if (path.startsWith("/swagger-ui") ||
 				path.startsWith("/v3/api-docs") ||
 				path.startsWith("/swagger-resources/") ||
 				path.startsWith("/webjars/")) {
+				return true;
+			}
+
+			// Service-specific paths (simplified)
+			if (path.startsWith("/user-service/") ||
+				path.startsWith("/order-service/") ||
+				path.startsWith("/store-service/") ||
+				path.startsWith("/payment-service/")) {
 				return true;
 			}
 

@@ -29,6 +29,38 @@ public class GatewayConfig {
 					.addRequestHeader("X-Service-Name", "user-service"))
 				.uri("lb://user-service"))
 
+			// User Service Swagger UI - Simple forwarding
+			.route("user-service-swagger", r -> r
+				.path("/user-service/**")
+				.filters(f -> f
+					.rewritePath("/user-service/(?<segment>.*)", "/${segment}")
+					.addRequestHeader("X-Service-Name", "user-service"))
+				.uri("lb://user-service"))
+
+			// Order Service Swagger UI - Simple forwarding
+			.route("order-service-swagger", r -> r
+				.path("/order-service/**")
+				.filters(f -> f
+					.rewritePath("/order-service/(?<segment>.*)", "/${segment}")
+					.addRequestHeader("X-Service-Name", "order-service"))
+				.uri("lb://order-service"))
+
+			// Store Service Swagger UI - Simple forwarding
+			.route("store-service-swagger", r -> r
+				.path("/store-service/**")
+				.filters(f -> f
+					.rewritePath("/store-service/(?<segment>.*)", "/${segment}")
+					.addRequestHeader("X-Service-Name", "store-service"))
+				.uri("lb://store-service"))
+
+			// Payment Service Swagger UI - Simple forwarding
+			.route("payment-service-swagger", r -> r
+				.path("/payment-service/**")
+				.filters(f -> f
+					.rewritePath("/payment-service/(?<segment>.*)", "/${segment}")
+					.addRequestHeader("X-Service-Name", "payment-service"))
+				.uri("lb://payment-service"))
+
 			.route("order-service", r -> r
 				.path("/api/orders/**")
 				.filters(f -> f
