@@ -1,6 +1,8 @@
-.git
-target
-.env
-app.env
-*.iml
-.idea
+# .dockerignore
+ .git
+- build
+ .gradle
+ .env
+ app.env
+ *.iml
+ .idea
