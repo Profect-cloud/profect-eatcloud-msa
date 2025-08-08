@@ -1,0 +1,6 @@
+.git
+target
+.env
+app.env
+*.iml
+.idea
