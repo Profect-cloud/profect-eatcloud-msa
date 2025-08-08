@@ -1,14 +1,15 @@
-FROM maven:3.9.8-eclipse-temurin-21 AS build
-WORKDIR /app
-COPY pom.xml .
-RUN --mount=type=cache,target=/root/.m2 mvn -q -B -DskipTests dependency:go-offline
-COPY src ./src
-RUN --mount=type=cache,target=/root/.m2 mvn -q -B -DskipTests package
+# === build ===
+FROM gradle:8.8-jdk21 AS build
+WORKDIR /workspace
+COPY . .
+RUN gradle -q --no-daemon clean bootJar
 
+# === run ===
 FROM eclipse-temurin:21-jre-alpine
 ENV TZ=Asia/Seoul
 WORKDIR /app
-COPY --from=build /app/target/*SNAPSHOT.jar app.jar
+# 산출물 경로: build/libs/*.jar (프로젝트 설정에 따라 -SNAPSHOT 유무 상관없이 한 개만 있을 거라 가정)
+COPY --from=build /workspace/build/libs/*jar app.jar
 ENV JAVA_OPTS="-XX:+UseZGC -XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError"
 EXPOSE 8080
 HEALTHCHECK --interval=20s --timeout=3s --retries=5 CMD wget -qO- http://localhost:8080/actuator/health || exit 1
