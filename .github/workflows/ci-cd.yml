@@ -1,8 +1,4 @@
-# 충돌 상태 확인(선택)
-  git status
-  
-  # 1) 워크플로 파일을 최종본으로 덮어쓰기
-  cat > .github/workflows/ci-cd.yml <<'YAML'
+
 name: ci-cd-compose
 
 on:
