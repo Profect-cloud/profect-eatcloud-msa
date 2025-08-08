@@ -21,3 +21,4 @@ services:
     volumes:
       - /srv/eatcloud/data/redis:/data
     restart: unless-stopped
+
