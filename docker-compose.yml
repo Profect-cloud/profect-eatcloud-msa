@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # ================== 데이터베이스들 ==================
   user-db:
     platform: linux/amd64
     image: postgis/postgis:latest
@@ -108,7 +107,6 @@ services:
     networks:
       - eatcloud-network
 
-  # ================== MSA 인프라 ==================
   eureka-server:
     build:
       context: .
@@ -121,7 +119,7 @@ services:
     networks:
       - eatcloud-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8761/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -142,56 +140,55 @@ services:
     networks:
       - eatcloud-network
 
-  # ================== 마이크로서비스들 ==================
-  user-service:
-    build:
-      context: .
-      dockerfile: user-service/Dockerfile
-    container_name: user-service
-    ports:
-      - "8081:8081"
-    environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - DB_HOST=user-db
-      - DB_NAME=user_db
-      - DB_USER=user
-      - DB_PASSWORD=${POSTGRES_PASSWORD}
-      - REDIS_HOST=redis
-      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka
-    env_file:
-      - .env
-    depends_on:
-      user-db:
-        condition: service_healthy
-      eureka-server:
-        condition: service_healthy
-    networks:
-      - eatcloud-network
+#  user-service:
+#    build:
+#      context: .
+#      dockerfile: user-service/Dockerfile
+#    container_name: user-service
+#    ports:
+#      - "8081:8081"
+#    environment:
+#      - SPRING_PROFILES_ACTIVE=docker
+#      - DB_HOST=user-db
+#      - DB_NAME=user_db
+#      - DB_USER=user
+#      - DB_PASSWORD=${POSTGRES_PASSWORD}
+#      - REDIS_HOST=redis
+#      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka
+#    env_file:
+#      - .env
+#    depends_on:
+#      user-db:
+#        condition: service_healthy
+#      eureka-server:
+#        condition: service_healthy
+#    networks:
+#      - eatcloud-network
 
-  store-service:
-    build:
-      context: .
-      dockerfile: store-service/Dockerfile
-    container_name: store-service
-    ports:
-      - "8082:8082"
-    environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - DB_HOST=store-db
-      - DB_NAME=store_db
-      - DB_USER=user
-      - DB_PASSWORD=${POSTGRES_PASSWORD}
-      - REDIS_HOST=redis
-      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka
-    env_file:
-      - .env
-    depends_on:
-      store-db:
-        condition: service_healthy
-      eureka-server:
-        condition: service_healthy
-    networks:
-      - eatcloud-network
+#  store-service:
+#    build:
+#      context: .
+#      dockerfile: store-service/Dockerfile
+#    container_name: store-service
+#    ports:
+#      - "8082:8082"
+#    environment:
+#      - SPRING_PROFILES_ACTIVE=docker
+#      - DB_HOST=store-db
+#      - DB_NAME=store_db
+#      - DB_USER=user
+#      - DB_PASSWORD=${POSTGRES_PASSWORD}
+#      - REDIS_HOST=redis
+#      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka
+#    env_file:
+#      - .env
+#    depends_on:
+#      store-db:
+#        condition: service_healthy
+#      eureka-server:
+#        condition: service_healthy
+#    networks:
+#      - eatcloud-network
 
   order-service:
     build:
@@ -218,30 +215,30 @@ services:
     networks:
       - eatcloud-network
 
-  payment-service:
-    build:
-      context: .
-      dockerfile: payment-service/Dockerfile
-    container_name: payment-service
-    ports:
-      - "8084:8084"
-    environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - DB_HOST=payment-db
-      - DB_NAME=payment_db
-      - DB_USER=user
-      - DB_PASSWORD=${POSTGRES_PASSWORD}
-      - REDIS_HOST=redis
-      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka
-    env_file:
-      - .env
-    depends_on:
-      payment-db:
-        condition: service_healthy
-      eureka-server:
-        condition: service_healthy
-    networks:
-      - eatcloud-network
+#  payment-service:
+#    build:
+#      context: .
+#      dockerfile: payment-service/Dockerfile
+#    container_name: payment-service
+#    ports:
+#      - "8084:8084"
+#    environment:
+#      - SPRING_PROFILES_ACTIVE=docker
+#      - DB_HOST=payment-db
+#      - DB_NAME=payment_db
+#      - DB_USER=user
+#      - DB_PASSWORD=${POSTGRES_PASSWORD}
+#      - REDIS_HOST=redis
+#      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://eureka-server:8761/eureka
+#    env_file:
+#      - .env
+#    depends_on:
+#      payment-db:
+#        condition: service_healthy
+#      eureka-server:
+#        condition: service_healthy
+#    networks:
+#      - eatcloud-network
 
 volumes:
   user_db_data:
