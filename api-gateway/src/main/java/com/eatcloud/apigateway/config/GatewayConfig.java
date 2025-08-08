@@ -18,7 +18,7 @@ public class GatewayConfig {
 			.route("auth-service", r -> r
 				.path("/api/v1/auth/**")
 				.filters(f -> f
-					.stripPrefix(2)
+					// 인증 경로는 user-service 컨트롤러 매핑(`/api/v1/auth/**`)과 일치시키기 위해 prefix 제거 안 함
 					.addRequestHeader("X-Service-Name", "auth-service"))
 				.uri("lb://user-service"))
 
